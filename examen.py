@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 from abc import ABC, abstractmethod
 
 # CONFIGURACIÓN
@@ -46,7 +47,59 @@ class MonitorInventario:
 
 
     async def _consultar_inventario(self):
-        pass
+
+        headers = {
+            "Authorization": f"Bearer {TOKEN}",
+            "Accept": "application/json"
+        }
+
+        if self._ultimo_etag:
+            headers["If-None-Match"] = self._ultimo_etag
+
+        url = f"{BASE_URL}/inventario"
+
+        try:
+
+            timeout = aiohttp.ClientTimeout(total=TIMEOUT)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+
+                async with session.get(url, headers=headers) as resp:
+
+                    if resp.status == 200:
+
+                        data = await resp.json()
+
+                        self._ultimo_etag = resp.headers.get("ETag")
+
+                        return data
+
+
+                    elif resp.status == 304:
+                        print("Inventario sin cambios")
+                        return None
+
+
+                    elif 400 <= resp.status < 500:
+                        print("Error cliente:", resp.status)
+                        return None
+
+
+                    elif 500 <= resp.status < 600:
+                        print("Error servidor:", resp.status)
+
+                        self._intervalo = min(self._intervalo * 2, INTERVALO_MAX)
+
+                        return None
+
+
+        except asyncio.TimeoutError:
+            print("Timeout al consultar inventario")
+
+        except aiohttp.ClientConnectionError:
+            print("Error de conexión")
+
+        return None
 
 
     async def iniciar(self):
