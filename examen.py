@@ -103,7 +103,33 @@ class MonitorInventario:
 
 
     async def iniciar(self):
-        pass
+
+        self._ejecutando = True
+
+        while self._ejecutando:
+
+            inventario = await self._consultar_inventario()
+
+            if inventario:
+
+                if inventario != self._ultimo_estado:
+
+                    print("Inventario actualizado")
+
+                    await self._notificar(inventario)
+
+                    self._ultimo_estado = inventario
+
+                    # reset del intervalo si hubo cambios
+                    self._intervalo = INTERVALO_BASE
+
+                else:
+                    print("Sin cambios en inventario")
+
+                    # pequeño backoff si no hay cambios
+                    self._intervalo = min(self._intervalo * 2, INTERVALO_MAX)
+
+            await asyncio.sleep(self._intervalo)
 
 
     def detener(self):
