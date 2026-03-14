@@ -140,18 +140,56 @@ class MonitorInventario:
 class ModuloCompras(Observador):
 
     async def actualizar(self, inventario):
-        pass
+
+        productos = inventario.get("productos", [])
+
+        for p in productos:
+
+            if p.get("status") == "BAJO_MINIMO":
+
+                print(
+                    f"Producto bajo mínimo: {p['nombre']} stock:{p['stock']}"
+                )
 
 
 class ModuloAlertas(Observador):
 
     async def actualizar(self, inventario):
-        pass
 
+        productos = inventario.get("productos", [])
+
+        url = f"{BASE_URL}/alertas"
+
+        async with aiohttp.ClientSession() as session:
+
+            for p in productos:
+
+                if p.get("status") == "BAJO_MINIMO":
+
+                    body = {
+                        "producto_id": p["id"],
+                        "stock_actual": p["stock"],
+                        "stock_minimo": p["stock_minimo"],
+                        "timestamp": "2025-03-15T09:00:00Z"
+                    }
+
+                    headers = {
+                        "Authorization": f"Bearer {TOKEN}",
+                        "Content-Type": "application/json"
+                    }
+
+                    async with session.post(url, json=body, headers=headers) as resp:
+
+                        if resp.status == 201:
+                            print("Alerta enviada")
+
+                        elif resp.status == 422:
+                            print("Datos inválidos")
 
 # MAIN
 async def main():
 
+    print("Monitor de inventario iniciado")
     monitor = MonitorInventario()
 
     monitor.suscribir(ModuloCompras())
